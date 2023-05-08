@@ -198,5 +198,23 @@ namespace BattleShipLibrary
             
 
         }
+
+        public static bool JokerHelp(PlayerInfoModel jokerHelp, string row, int column)
+        {
+            bool isAHit = false;
+
+            foreach (var ship in jokerHelp.ShipLocations)
+            {
+                if (ship.SpotLetter == row.ToUpper() && ship.SpotNumber == column)
+                {
+                    isAHit = true;
+                    ship.Status = GridSpotStatus.Sunk;
+                }
+            }
+            return isAHit;
+        }
+         
+            
+        }
     }
-}
+

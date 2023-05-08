@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -14,8 +15,10 @@ namespace BattleShip
         static void Main(string[] args)
         {
             WelcomeMessage();
+            
             PlayerInfoModel activePlayer = CreatePlayer("Player 1");
             PlayerInfoModel opponent = CreatePlayer("Player 2");
+            PlayerInfoModel jokerHelp = CreatePlayer("Third player", isJoker:true);
             PlayerInfoModel winner = null;
 
 
@@ -23,22 +26,32 @@ namespace BattleShip
             {
                 DisplayShotGrid(activePlayer);
 
-                RecordPlayerShot(activePlayer, opponent);
+                RecordPlayerShot(activePlayer, opponent, jokerHelp);
+
+              
 
 
                 bool doesGameContinue = GameLogic.PlayerStillActive(opponent);
 
-
                 if (doesGameContinue == true)
                 {
-
-
-                    (activePlayer, opponent) = (opponent, activePlayer);
+                    if (activePlayer.UsesJoker)
+                    {
+                        activePlayer = jokerHelp;
+                    }
+                    else if (opponent.UsesJoker)
+                    {
+                        opponent = jokerHelp;
+                    }
+                    else
+                    {
+                        (activePlayer, opponent) = (opponent, activePlayer);
+                    }
+                    
                 }
                 else
                 {
                     winner = activePlayer;
-
                 }
 
             } while (winner == null);
@@ -48,13 +61,42 @@ namespace BattleShip
             Console.ReadLine();
         }
 
+        private static bool TriggerJoker(PlayerInfoModel jokerHelp)
+        {
+
+            if (jokerHelp.JokerUsed)
+            {
+                return false;
+            }
+
+            Console.WriteLine("Do you want to use the joker or the third player to take over your game(yes/no)");
+            string answer = Console.ReadLine().ToLower();
+
+            if (answer == "yes")
+            {
+                jokerHelp.JokerUsed = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static void CopyShipLocations(PlayerInfoModel fromPlayer, PlayerInfoModel toPlayer)
+        {
+            toPlayer.ShipLocations = new List<GridSpotModel>(fromPlayer.ShipLocations);
+        }
+
+
+
+
+
         private static void IdentifyWinner(PlayerInfoModel winner)
         {
             Console.WriteLine($"Congratualion to {winner.UsersName} for winning");
             Console.WriteLine($"{winner.UsersName} took {GameLogic.GetShotCount(winner)} shots.");
         }
 
-        private static void RecordPlayerShot(PlayerInfoModel activePlayer, PlayerInfoModel opponent)
+        private static void RecordPlayerShot(PlayerInfoModel activePlayer, PlayerInfoModel opponent, PlayerInfoModel jokerHelp)
         {
             bool isValidShot = false;
             string row = "";
@@ -65,7 +107,9 @@ namespace BattleShip
                 try
                 {
                     (row, column) = GameLogic.SplitShotIntoRowAndColumn(shot);
-                    isValidShot = GameLogic.ValidateShot(activePlayer, row, column);
+                    isValidShot = GameLogic.ValidateShot(opponent, row, column);
+                    
+
                 }
                 catch (Exception ex)
                 {
@@ -89,9 +133,18 @@ namespace BattleShip
 
             bool isAHit = GameLogic.IdentifyShotResult(opponent, row, column);
 
+
             GameLogic.MarkShotResult(activePlayer, row, column, isAHit);
 
+
             DisplayShotResult(row, column, isAHit);
+
+            if (activePlayer.UsersName != jokerHelp.UsersName && TriggerJoker(jokerHelp))
+            {
+                Console.WriteLine($"{activePlayer.UsersName} has left the game. third player is taking over");
+                CopyShipLocations(activePlayer, jokerHelp); // Copy ship locations from the leaving player to the joker
+                activePlayer.UsesJoker = true;
+            }
 
         }
 
@@ -158,7 +211,7 @@ namespace BattleShip
             Console.WriteLine();
         }
 
-        private static PlayerInfoModel CreatePlayer(string playerTitle)
+        private static PlayerInfoModel CreatePlayer(string playerTitle, bool isJoker=false)
         {
             PlayerInfoModel output = new PlayerInfoModel();
             Console.WriteLine($"Player information for {playerTitle}");
@@ -168,7 +221,13 @@ namespace BattleShip
             // CREATE THE SHIP GRID
             GameLogic.InitializeGrid(output); // This is a public static class which take one argument from PlayerInfoModel  
             //ASK THE USER FOR THEIR 5 SHIPS
-            PlaceShips(output);
+
+            if (!isJoker)
+            {
+                PlaceShips(output);
+            }
+            
+
 
             Console.Clear();
 
